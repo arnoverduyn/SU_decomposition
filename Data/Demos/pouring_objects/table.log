@@ -1,0 +1,32 @@
+Solid Edge Translation To obj
+Date: maandag,juni 10,2024 03:55
+Output File: C:\Users\u0140902\Desktop\tricer\Data\pouring_objects\table.obj
+Author: Unknown
+Organization: Unknown
+Source System: SOLID EDGE
+
+Hardware:
+Processor: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
+Operating System: Windows 10 Enterprise Edition
+Installed Memory: 15.85 GB
+
+Software Information:
+Parasolid Version: 31.1.255
+PSBodyshop Version: 31.1.110
+OBJ Adapter Version: 5.0.79
+Solid Edge Version: 220.00.00.104 x64
+
+OBJ Export Options:
+Export Construction Solids:Off
+Export Displayed Parts:Off
+Export Construction Sheets:Off
+Enable Logging:On
+Export Textures:Off
+Export Units:Millimeters
+Export Tolerance Value:1.250000
+Export Tolerance Type:Custom
+Export Surface Plane Angle Value:0.523599
+
+Translation progress:
+Translation process completed
+Time required to translate:00 : 00 : 00
