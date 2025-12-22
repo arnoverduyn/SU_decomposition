@@ -40,69 +40,101 @@ def write_csv_file(file, file_location):
     return
 
 def load_demo_trajectory(input_trajectory,path_to_data):
-    if input_trajectory == 'translation':
-        T, dt = synthetic_pose_trajectory()
-    elif  input_trajectory == 'rotation':
-        T, dt = synthetic_pose_trajectory_rot()
+    if input_trajectory == 'helical_translation':
+        T, dt = synthetic_helical_translation()
+    elif  input_trajectory == 'axis_rotation':
+        T, dt = synthetic_axis_rotation()
+    elif  input_trajectory == 'precession':
+        T, dt = synthetic_precession()
     elif input_trajectory == 'pouring':
-        T, dt = load_recorded_pouring_motion_gen(path_to_data)
+        T, dt = load_recorded_pouring_motion(path_to_data)
     return T, dt
 
 
-def synthetic_pose_trajectory():
+def synthetic_helical_translation():
     """
-    Generate synthetic trajectory
+    Generate trajectory data of a helical translation
     """
-    N = 30
-    s = np.linspace(0, 1, N)
-    r = 0.2  # 20 cm
-    p_x = np.concatenate([r * np.cos(np.pi * s), -3/2 * r + r/2 * np.cos(np.pi * s[1:])])
-    p_y = np.concatenate([r * np.sin(np.pi * s), r/2 * np.sin(np.pi * (1 + s[1:]))])
-    p_z = np.concatenate([np.zeros_like(s), np.zeros_like(s[1:])])
-    p = np.vstack([1 + p_x, 1 + p_y, p_z])
-    N = p.shape[1]
-    p += 1e-4 * np.random.randn(3, N)
-    
-    # Perform a smoothing action
-    p = np.transpose(pd.DataFrame(p).T.rolling(window=2, min_periods=1).mean().values)
+    N = 60 # number of samples
+    time_total = 1 # seconds
+    time_axis = np.linspace(0, time_total, N)
+    dt = time_total/(N-1)  # [s]
+
+    r = 0.2  # radius of the circular trajectory
+    p_x = np.array([r * np.cos(np.pi * time_axis/time_total)])
+    p_y = np.array([r * np.sin(np.pi * time_axis/time_total)])
+    p_z = np.array([r*time_axis/time_total])
+    p = np.vstack([p_x, p_y, p_z])
+    p += 1e-5 * np.random.randn(3, N)
 
     T = np.zeros((4, 4, N))
     for k in range(N):
         T[0:3, 3, k] = p[:, k]
-        T[0:3, 0:3, k] = R.from_euler('xyz', 1e-3 * np.random.randn(3)).as_matrix()
+        T[0:3, 0:3, k] = R.from_euler('xyz', 1e-5 * np.random.randn(3)).as_matrix()
         T[3, 3, k] = 1
-    dt = 0.05  # [s]
     
     return T, dt
 
-def synthetic_pose_trajectory_rot():
+def synthetic_axis_rotation():
     """
-    Generate synthetic trajectory
+    Generate trajectory data of a rotation about a fixed axis
     """
     N = 60
-    s = np.linspace(0, 1, N)
-    r = 0.2  # 20 cm
-    p_x = r * np.cos(np.pi * s)
-    p_y = r * np.sin(np.pi * s)
-    p_z = np.zeros_like(s)
-    p = np.vstack([1 + p_x, 1 + p_y, p_z])
-    N = p.shape[1]
-    p += 1e-4 * np.random.randn(3, N)
+    time_total = 2 # seconds
+    time_axis = np.linspace(0, time_total, N)
+    dt = time_total/(N-1)  # [s]
     
-    # Perform a smoothing action
-    p = np.transpose(pd.DataFrame(p).T.rolling(window=2, min_periods=1).mean().values)
-
     T = np.zeros((4, 4, N))
     for k in range(N):
-        T[0:3, 3, k] = p[:, k]
-        T[0:3, 0:3, k] = (R.from_euler('xyz', 1e-3 * np.random.randn(3)) *
-                          R.from_euler('z', 180 * s[k], degrees=True)).as_matrix()
+    
+        ROT = R.from_euler('z', 270 * time_axis[k]/time_total, degrees=True).as_matrix()
+        T[0:3, 0:3, k] = ROT
         T[3, 3, k] = 1
-    dt = 0.05  # [s]
+
+        # displace body frame origin away from the zero vector
+        T_disp = np.eye(4)
+        T_disp[0,3] = 0.2
+        T[: ,: , k] = T[: ,: , k] @ T_disp
+
+        # Add artifical noise to avoid exact singularities
+        T[0:3, 3, k] = T[0:3, 3, k] + 1e-5 * np.random.randn(1,3)
+        T[0:3, 0:3, k] = T[0:3, 0:3, k] @ R.from_euler('xyz', 1e-5 * np.random.randn(3)).as_matrix()
     
     return T, dt
 
-def load_recorded_pouring_motion_gen(path_to_data):
+def synthetic_precession():
+    """
+    Generate trajectory data of a precession motion
+    """
+    N = 60
+    time_total = 2 # seconds
+    time_axis = np.linspace(0, time_total, N)
+    dt = time_total/(N-1)  # [s]
+    
+    T = np.zeros((4, 4, N))
+    for k in range(N):
+        
+        # First rotation
+        ROT1 = R.from_euler('z', 270 * time_axis[k]/time_total, degrees=True).as_matrix()
+        T[0:3, 0:3, k] = ROT1
+        T[3, 3, k] = 1
+
+        # Displace body frame origin away from the zero vector
+        T_disp = np.eye(4)
+        T_disp[0,3] = 0.2
+        T[: ,: , k] = T[: ,: , k] @ T_disp
+
+        # Second rotation -> precession
+        ROT2 = R.from_euler('x', 270 * time_axis[k]/time_total, degrees=True).as_matrix()
+        T[0:3, 0:3, k] = T[0:3, 0:3, k] @ ROT2
+        
+        # Add artifical noise to avoid exact singularities
+        T[0:3, 3, k] = T[0:3, 3, k] + 1e-5 * np.random.randn(1,3)
+        T[0:3, 0:3, k] = T[0:3, 0:3, k] @ R.from_euler('xyz', 1e-5 * np.random.randn(3)).as_matrix()
+    
+    return T, dt
+
+def load_recorded_pouring_motion(path_to_data):
     data_file = rf'{path_to_data}/Demos/pouring/Trial1_coffee_kettle_ref_top.csv'
     T, dt = load_csv_file(data_file)
     N = T.shape[2]

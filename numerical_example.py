@@ -6,7 +6,7 @@ path_to_figures = 'figures'
 ############ Load and preprocess the trajectory data ##########
 
 # Load the data
-input_trajectory = 'pouring'  # options: 'translation', 'rotation', 'pouring'
+input_trajectory = 'helical_translation'  # options: 'helical_translation', 'axis_rotation', 'precession', 'pouring'
 T_raw, dt = src.data_handling.load_demo_trajectory(input_trajectory,path_to_data)
 N = T_raw.shape[2]
 time_total = (N-1)*dt
@@ -42,9 +42,9 @@ for j in range(2):
 ############ Calculate the SU decomposition ########## 
 
 # Initialise the results
-Xi = [numpy.zeros((6,3,N-2)), numpy.zeros((6,3,N-2))]
-U = [numpy.zeros((6,3,N-2)), numpy.zeros((6,3,N-2))]
-U_reg = [numpy.zeros((6,3,N-2)), numpy.zeros((6,3,N-2))]
+Xi = [numpy.zeros((6,3,N-3)), numpy.zeros((6,3,N-3))]
+U = [numpy.zeros((6,3,N-3)), numpy.zeros((6,3,N-3))]
+U_reg = [numpy.zeros((6,3,N-3)), numpy.zeros((6,3,N-3))]
 
 for j in range(2):
 
@@ -55,7 +55,7 @@ for j in range(2):
     twist_smooth = scipy.ndimage.gaussian_filter1d(twist, sigma= 1, axis=1, mode='nearest')
 
     # Perform the successive SU decompositions along the trajectory
-    for k in range(N-2): 
+    for k in range(N-3): 
 
         # Restructure twist data into successive overlapping windows of size (6,3)
         Xi_ = numpy.column_stack([twist_smooth[:,k], twist_smooth[:,k+1], twist_smooth[:,k+2]])
@@ -64,7 +64,7 @@ for j in range(2):
         U_, _, _ = src.SU_decomp.SU(Xi_)
 
         # Compute U matrix with regularization
-        U_reg_, _, _ = src.SU_decomp.SU(Xi_, L = 0.2)
+        U_reg_, _, _ = src.SU_decomp.SU(Xi_, L = 0.0)
 
         # Store the results
         Xi[j][:,:,k] = Xi_
@@ -74,7 +74,7 @@ for j in range(2):
 
 ############ Plot the results ########## 
 (kettle,_,_,_) = src.data_handling.retrieve_data_designed_objects(path_to_data)
-src.plotting.plot_trajectories_with_kettle(T_sub, T_var, kettle, path_to_figures)
-src.plotting.plot_twists(Xi, time_total, 'twists.svg', path_to_figures)
-src.plotting.plot_U(U, time_total, 'U.svg', path_to_figures)
-src.plotting.plot_U(U_reg, time_total, 'U_reg.svg', path_to_figures)
+src.plotting.plot_trajectories(T_sub, T_var, kettle, input_trajectory, path_to_figures)
+src.plotting.plot_twists(Xi, time_total, 'twists.svg', input_trajectory, path_to_figures)
+src.plotting.plot_U(U, time_total, 'U.svg', input_trajectory, path_to_figures)
+src.plotting.plot_U(U_reg, time_total, 'U_reg.svg', input_trajectory, path_to_figures)

@@ -21,6 +21,7 @@ def RU_signed(A):
     ey = ey / np.linalg.norm(ey)
     
     ez = np.cross(ex, ey)
+    ez /= np.linalg.norm(ez)
     R = np.column_stack((ex, ey, ez))
 
     U = R.T @ A

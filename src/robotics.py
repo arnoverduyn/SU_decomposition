@@ -179,18 +179,18 @@ def rot2quat(R_all):
 
 def calculate_bodytwist_from_poses(T, ds):
     N = T.shape[2]
-    screwtwist = np.zeros((6, N))
+    twist = np.zeros((6, N-1))
     
     for k in range(N-1):
         twist_cross = logm_pose(inverse_T(T[:, :, k]) @ T[:, :, k+1]) / ds
         skew_omega = twist_cross[:3, :3]
-        screwtwist[:3, k] = extract_vector_from_skew(skew_omega)
-        screwtwist[3:6, k] = twist_cross[:3, 3]
+        twist[:3, k] = extract_vector_from_skew(skew_omega)
+        twist[3:6, k] = twist_cross[:3, 3]
 
     # Copy last sample to maintain the same number of samples as the input T
-    screwtwist[:, N-1] = screwtwist[:,N-2]
+    # screwtwist[:, N-1] = screwtwist[:,N-2]
 
-    return screwtwist
+    return twist
 
 
 
