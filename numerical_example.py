@@ -6,7 +6,7 @@ path_to_figures = 'figures'
 ############ Load and preprocess the trajectory data ##########
 
 # Load the data
-input_trajectory = 'helical_translation'  # options: 'helical_translation', 'axis_rotation', 'precession', 'pouring'
+input_trajectory = 'pouring'  # options: 'helical_translation', 'axis_rotation', 'precession', 'pouring'
 T_raw, dt = src.data_handling.load_demo_trajectory(input_trajectory,path_to_data)
 N = T_raw.shape[2]
 time_total = (N-1)*dt
@@ -15,7 +15,6 @@ time_total = (N-1)*dt
 T_sub = T_raw[:,:,0:N:3]
 dt = 3*dt
 N = T_sub.shape[2]
-
 
 ############ Introduce variations in coordinate frame ##########
 
@@ -64,7 +63,7 @@ for j in range(2):
         U_, _, _ = src.SU_decomp.SU(Xi_)
 
         # Compute U matrix with regularization
-        U_reg_, _, _ = src.SU_decomp.SU(Xi_, L = 0.0)
+        U_reg_, _, _ = src.SU_decomp.SU(Xi_, L = 0.3)
 
         # Store the results
         Xi[j][:,:,k] = Xi_
@@ -73,8 +72,7 @@ for j in range(2):
 
 
 ############ Plot the results ########## 
-(kettle,_,_,_) = src.data_handling.retrieve_data_designed_objects(path_to_data)
-src.plotting.plot_trajectories(T_sub, T_var, kettle, input_trajectory, path_to_figures)
+src.plotting.plot_trajectories(T_sub, T_var, input_trajectory, path_to_data, path_to_figures)
 src.plotting.plot_twists(Xi, time_total, 'twists.svg', input_trajectory, path_to_figures)
 src.plotting.plot_U(U, time_total, 'U.svg', input_trajectory, path_to_figures)
 src.plotting.plot_U(U_reg, time_total, 'U_reg.svg', input_trajectory, path_to_figures)

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.colors import LightSource
 from scipy.spatial.transform import Rotation as R
+import src.data_handling
     
 # Normals for shading
 def compute_normals(faces):
@@ -15,8 +16,9 @@ def compute_normals(faces):
     return np.array(normals)
 
 
-def plot_trajectories(T_sub, T_var, kettle, input_trajectory, path_to_figures):
+def plot_trajectories(T_sub, T_var, input_trajectory, path_to_data, path_to_figures):
     if input_trajectory == 'pouring':
+        (kettle,_,_,_) = src.data_handling.retrieve_data_designed_objects(path_to_data)
         plot_trajectories_with_kettle(T_sub, T_var, kettle, path_to_figures)
     else:
         plot_trajectories_with_cube(T_sub, T_var, path_to_figures) 
