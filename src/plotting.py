@@ -101,11 +101,11 @@ def plot_trajectories_with_cube(T, T_var, path_to_figures):
     ax.set_yticks([-0.2, 0.2])
     ax.set_zlim([-0.2, 0.4])
     ax.set_zticks([-0.1, 0.3])
-    ax.set_xlabel(r'$x~[m]$', fontsize=20)
-    ax.set_ylabel(r'$y~[m]$', fontsize=20)
-    ax.set_zlabel(r'$z~[m]$', fontsize=20)
-    ax.tick_params(axis='both', which='major', labelsize=14)  # for x and y
-    ax.tick_params(axis='z', which='major', labelsize=14)     # for z
+    ax.set_xlabel(r'$x~[m]$', fontsize=40)
+    ax.set_ylabel(r'$y~[m]$', fontsize=40)
+    ax.set_zlabel(r'$z~[m]$', fontsize=40)
+    ax.tick_params(axis='both', which='major', labelsize=28)  # for x and y
+    ax.tick_params(axis='z', which='major', labelsize=28)     # for z
 
     plt.tight_layout()
     plt.savefig(rf"{path_to_figures}/trajectory.svg")
@@ -175,11 +175,12 @@ def plot_trajectories_with_kettle(T, T_var, kettle, path_to_figures):
     ax.set_yticks([2.0,2.4])
     ax.set_zlim([-2.2, -1.7])
     ax.set_zticks([-2.1,-1.8])
-    ax.set_xlabel(r'$x~[m]$', fontsize=20)
-    ax.set_ylabel(r'$y~[m]$', fontsize=20)
-    ax.set_zlabel(r'$z~[m]$', fontsize=20)
-    ax.tick_params(axis='both', which='major', labelsize=14)  # for x and y
-    ax.tick_params(axis='z', which='major', labelsize=14)     # for z
+    ax.set_xlabel(r'$x~[m]$', fontsize=30)
+    ax.set_ylabel(r'$y~[m]$', fontsize=30)
+    ax.set_zlabel(r'$z~[m]$', fontsize=30)
+    ax.tick_params(axis='both', which='major', labelsize=20)  # for x and y
+    ax.tick_params(axis='z', which='major', labelsize=20)     # for z
+    ax.set_axis_off()
 
     plt.tight_layout()
     plt.savefig(rf"{path_to_figures}/trajectory.svg")
@@ -189,37 +190,47 @@ def plot_twists(Xi, s_max, name, input_trajectory, path_to_figures,):
     colors = ['b','r']
     axes = ['x','y','z']
 
-    fig = plt.figure(figsize=(4, 4.5))
+    fig = plt.figure(figsize=(7, 3.5))
     x_axis = np.linspace(0, s_max, Xi[0].shape[2])
     
-    nb_rows = 3
-    nb_columns = 2
+    fontsize_axes = 13
+    fontsize_title = 15
+    nb_rows = 2
+    nb_columns = 3
     for row_subplot in range(nb_rows):
         for col_subplot in range(nb_columns):
 
             plt.subplot(nb_rows,nb_columns, 1 + row_subplot*nb_columns + col_subplot)
 
             for j in range(2):
-                plt.plot(x_axis, Xi[j][col_subplot*nb_rows + row_subplot,0,:], color=colors[j])
+                plt.plot(x_axis, Xi[j][row_subplot*nb_columns + col_subplot,0,:], color=colors[j])
 
-            if col_subplot < 0.5:
+            if row_subplot < 0.5:
                 plt.ylim([-4, 4])
-                plt.yticks([-4, 0, 4])
-                plt.title(rf'$\omega_{{{axes[row_subplot]}}}~[rad/s]$')
+                plt.yticks([-4, 0, 4],fontsize=fontsize_axes)
+                plt.title(rf'$\omega_{{{axes[col_subplot]}}}~[rad/s]$',fontsize=fontsize_title)
             else:
                 plt.ylim([-1, 1])
-                plt.yticks([-1, 0, 1])
-                plt.title(rf'$v_{{{axes[row_subplot]}}}~[rad/s]$')
+                plt.yticks([-1, 0, 1],fontsize=fontsize_axes)
+                plt.title(rf'$v_{{{axes[col_subplot]}}}~[m/s]$',fontsize=fontsize_title)
 
             if input_trajectory == 'pouring':
                 plt.xlim([0, 2.8])
-                plt.xticks([0, 0.7, 1.6, 2.8])
+                plt.xticks([0, 0.7, 1.6, 2.8],fontsize=fontsize_axes)
             else:
                 plt.xlim([0, s_max])
                 plt.xticks([0, s_max])
 
-            plt.xlabel(r'$t~[s]$')
-            plt.grid(True)
+            ax = plt.gca()
+            ax.grid(True)
+
+            if col_subplot > 0.5:
+                ax.tick_params(labelleft=False)
+                
+            if row_subplot > 0.5:
+                ax.set_xlabel(r'$t~[s]$',fontsize=fontsize_axes)
+            else:
+                ax.tick_params(labelbottom=False)
 
     fig.tight_layout()  # Adjust subplots to fit in the figure area.
     plt.savefig(rf'{path_to_figures}/{name}')
@@ -230,7 +241,7 @@ def plot_U(U, s_max, name, input_trajectory, path_to_figures):
     colors = ['b','r']
     linewidths = [3.0,1.5]
 
-    fig = plt.figure(figsize=(6, 9))
+    fig = plt.figure(figsize=(7, 9))
     x_axis = np.linspace(0, s_max, U[0].shape[2])
 
     nb_rows = 6
@@ -261,25 +272,35 @@ def plot_U(U, s_max, name, input_trajectory, path_to_figures):
 
             idx = f'{row_subplot+1}{col_subplot+1}'
 
+            fontsize_axes = 13
+            fontsize_title = 15
             if row_subplot < 2.5:
                 plt.ylim([-4, 4])
-                plt.yticks([-4, 0, 4])
-                plt.title(rf'${{{name_component}}}_{{{idx}}}~[rad/s]$')
+                plt.yticks([-4, 0, 4], fontsize=fontsize_axes)
+                plt.title(rf'${{{name_component}}}_{{{idx}}}~[rad/s]$', fontsize=fontsize_title )
             else:
                 plt.ylim([-0.9, 0.9])
-                plt.yticks([-0.9, 0, 0.9])
-                plt.title(rf'${{{name_component}}}_{{{idx}}}~[m/s]$')
+                plt.yticks([-0.9, 0, 0.9], fontsize=fontsize_axes)
+                plt.title(rf'${{{name_component}}}_{{{idx}}}~[m/s]$', fontsize=fontsize_title )
 
             if input_trajectory == 'pouring':
                 plt.xlim([0, 2.8])
-                plt.xticks([0, 0.7, 1.6, 2.8])
+                plt.xticks([0, 0.7, 1.6, 2.8], fontsize=fontsize_axes )
             else:
                 plt.xlim([0, s_max])
                 plt.xticks([0, s_max])
 
-            plt.xlabel(r'$t~[s]$')
-            plt.grid(True)
+            ax = plt.gca()
+            ax.grid(True)
 
+            if col_subplot > 0.5:
+                ax.tick_params(labelleft=False)
+
+            if row_subplot > 4.5:
+                ax.set_xlabel(r'$t~[s]$', fontsize=fontsize_axes )
+            else:
+                ax.tick_params(labelbottom=False)
+            
     fig.tight_layout()  # Adjust subplots to fit in the figure area.
     plt.savefig(rf'{path_to_figures}/{name}')
 
