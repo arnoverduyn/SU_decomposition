@@ -4,224 +4,73 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.colors import LightSource
 from scipy.spatial.transform import Rotation as R
 import src.data_handling
-    
-# Normals for shading
-def compute_normals(faces):
-    normals = []
-    for face in faces:
-        v1, v2, v3 = face[0], face[1], face[2]
-        normal = np.cross(v2 - v1, v3 - v1)
-        normal /= np.linalg.norm(normal) + 1e-8
-        normals.append(normal)
-    return np.array(normals)
 
+def plot_trajectory_origin(ax, T, color = 'b', linewidth = 4.):
+    p = T[0:3, 3, :]    
+    ax.plot(p[0, :], p[1, :], p[2, :], color=color, linewidth=linewidth)
+    return ax
 
-def plot_trajectories(T_sub, T_var, input_trajectory, path_to_data, path_to_figures):
-    if input_trajectory == 'pouring':
-        (kettle,_,_,_) = src.data_handling.retrieve_data_designed_objects(path_to_data)
-        plot_trajectories_with_kettle(T_sub, T_var, kettle, path_to_figures)
-    else:
-        plot_trajectories_with_cube(T_sub, T_var, path_to_figures) 
+def plot_frame(ax, T, color = 'b', linewidth = 3., arrow_len = 0.08):
+    p = T[:3,3]
+    R = T[:3,:3]
+    for k in range(3):
+        ax.quiver(p[0], p[1], p[2], R[0, k], R[1, k], R[2, k], length=arrow_len, normalize=True, color=color, linewidth=linewidth)
+    return ax
 
+def plot_frames(ax, T, key_values, color = 'b', linewidth = 3., arrow_len = 0.08):
+    for j in key_values:
+        ax = plot_frame(ax, T[:,:,j], color = color, linewidth = linewidth, arrow_len = arrow_len)
+    return ax
 
-def plot_trajectories_with_cube(T, T_var, path_to_figures):
-    
-    fig = plt.figure(figsize=(9, 9))
-    ax = fig.add_subplot(111, projection='3d')
+def plot_rigid_body(ax, T, object_data):
 
-    # Lighting setup
+    nb_vertices = object_data['vertices'].shape[0]
+    hom_vertices = np.column_stack([object_data['vertices'],np.ones(nb_vertices)])
+    transformed_vertices = T @ hom_vertices.T
+
     ls = LightSource(azdeg=135, altdeg=45)
+    polygons = src.data_handling.construct_polygons(transformed_vertices[:3,:].T, object_data['faces'])
+    normals = src.data_handling.compute_normals(polygons)
+    shade_vals = ls.shade_normals(normals, fraction=1.0)  # Grayscale
+    cmap = plt.cm.Blues  # Or try 'viridis', 'plasma', etc.
+    shade_colors = cmap(0.4/(shade_vals+0.01))  # Map grayscale to RGBA
+    collection = Poly3DCollection(polygons, facecolors=shade_colors, edgecolors='none', linewidths=0)
+    collection.set_alpha(0.15)
 
-    N = T.shape[2]
-    keyframes = [0, round(0.22* N ), round(0.42* N ), round(0.6* N ), N-1]
+    ax.add_collection3d(collection)
+    return ax
 
-    
-    # Define cube vertices
-    r = [-0.07, 0.07]  # cube from -0.1 to 0.1 in all axes
-    vertices = np.array([
-        [0.05 + r[0], r[0]-0.01, r[0], 1.], [0.05 + r[1], r[0]-0.01, r[0], 1.],
-        [0.05 + r[1], r[1]-0.01, r[0], 1.], [0.05 + r[0], r[1]-0.01, r[0], 1.],
-        [0.05 + r[0], r[0]-0.01, r[1], 1.], [0.05 + r[1], r[0]-0.01, r[1], 1.],
-        [0.05 + r[1], r[1]-0.01, r[1], 1.], [0.05 + r[0], r[1]-0.01, r[1], 1.]
-    ])
-    vertices = vertices.T
+def plot_rigid_bodies(ax, T, key_values, object_data):
+    for j in key_values:
+        ax = plot_rigid_body(ax, T[:,:,j], object_data)
+    return ax
 
-    # Define cube faces (each face is a list of 4 vertices)
-    faces = [
-        [0, 1, 2, 3],  # bottom
-        [4, 5, 6, 7],  # top
-        [0, 1, 5, 4],  # front
-        [2, 3, 7, 6],  # back
-        [1, 2, 6, 5],  # right
-        [4, 7, 3, 0]   # left
-    ]
-
-    for k in keyframes:
-
-        transformed_vertices = T[:, :, k] @ vertices
-
-        # Face vertices for 3D collection
-        poly3d = [[transformed_vertices[:3, j] for j in face] for face in faces]
-        verts_array = np.array([np.array(face) for face in poly3d])
-
-        normals = compute_normals(verts_array)
-
-        # Lighting shading via LightSource
-        shade_vals = ls.shade_normals(normals, fraction=1.0)  # Grayscale
-        cmap = plt.cm.Blues  # Or try 'viridis', 'plasma', etc.
-        shade_colors = cmap(0.4/(shade_vals+0.01))  # Map grayscale to RGBA
-        collection = Poly3DCollection(verts_array, facecolors=shade_colors, edgecolors='none', linewidths=0)
-        collection.set_alpha(0.15)
-        ax.add_collection3d(collection)
-
-    # Plot trajectories of the origins of the different frames
-    nb_lines = len(T_var)
-    colors = ['b', 'r']
-
-    for j in range(nb_lines):
-        p = T_var[j][0:3, 3, :] 
-        ax.plot(p[0, :], p[1, :], p[2, :], color=colors[j], linewidth=4)
-
-        # Plot orientation body frame
-        start_end_frames = [keyframes[0],keyframes[-1]]
-        ROT = T_var[j][:3,:3,start_end_frames]
-
-        arrow_len = 0.08  
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 0], ROT[1, 0], ROT[2, 0], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 1], ROT[1, 1], ROT[2, 1], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 2], ROT[1, 2], ROT[2, 2], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-
-    ax.grid(False)
-    ax.set_box_aspect([1, 1, 1])  # Equal aspect
-    ax.set_facecolor('white')
-
-    ax.set_xlim([-0.3, 0.3])
-    ax.set_xticks([-0.2, 0.2])
-    ax.set_ylim([-0.3, 0.3])
-    ax.set_yticks([-0.2, 0.2])
-    ax.set_zlim([-0.2, 0.4])
-    ax.set_zticks([-0.1, 0.3])
-    ax.set_xlabel(r'$x~[m]$', fontsize=40)
-    ax.set_ylabel(r'$y~[m]$', fontsize=40)
-    ax.set_zlabel(r'$z~[m]$', fontsize=40)
-    ax.tick_params(axis='both', which='major', labelsize=28)  # for x and y
-    ax.tick_params(axis='z', which='major', labelsize=28)     # for z
-
-    plt.tight_layout()
-    plt.savefig(rf"{path_to_figures}/trajectory.svg")
-        
-        
-def plot_trajectories_with_kettle(T, T_var, kettle, path_to_figures):
-
-    fig = plt.figure(figsize=(9, 9))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Lighting setup
-    ls = LightSource(azdeg=135, altdeg=45)
-
-    N = T.shape[2]
-    keyframes = [0, round(0.22* N ), round(0.42* N ), round(0.6* N ), N-1]
-    
-    # Calibrate object vertices
-    vertices = np.vstack((kettle['homogeneous_vertices'][:3, :], kettle['homogeneous_vertices'][3, :]))
-    vertices[:3, :] += np.array([[-0.05], [0.04], [-0.01]])  # Offset
-    rot = R.from_euler('xzx', [180, 150, 4], degrees=True).as_matrix()
-    T_obj = np.eye(4)
-    T_obj[:3, :3] = rot
-    vertices = T_obj @ vertices
-        
-    for k in keyframes:
-
-        transformed_vertices = T[:, :, k] @ vertices
-
-        # Face vertices for 3D collection
-        poly3d = [[transformed_vertices[:3, j] for j in face] for face in kettle['faces']]
-        verts_array = np.array([np.array(face) for face in poly3d])
-
-        normals = compute_normals(verts_array)
-
-        # Lighting shading via LightSource
-        shade_vals = ls.shade_normals(normals, fraction=1.0)  # Grayscale
-        cmap = plt.cm.Blues  # Or try 'viridis', 'plasma', etc.
-        shade_colors = cmap(0.4/(shade_vals+0.01))  # Map grayscale to RGBA
-        collection = Poly3DCollection(verts_array, facecolors=shade_colors, edgecolors='none', linewidths=0)
-        collection.set_alpha(0.15)
-        ax.add_collection3d(collection)
-
-    # Plot trajectories of the origins of the different frames
-    nb_lines = len(T_var)
-    colors = ['b', 'r']
-
-    for j in range(nb_lines):
-        p = T_var[j][0:3, 3, :] 
-        ax.plot(p[0, :], p[1, :], p[2, :], color=colors[j], linewidth=4)
-
-        # Plot orientation body frame
-        start_end_frames = [keyframes[0],keyframes[-1]]
-        ROT = T_var[j][:3,:3,start_end_frames]
-
-        arrow_len = 0.08  
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 0], ROT[1, 0], ROT[2, 0], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 1], ROT[1, 1], ROT[2, 1], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-        ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 2], ROT[1, 2], ROT[2, 2], length=arrow_len, normalize=True, color=colors[j], linewidth=3.0)
-
-    ax.grid(False)
-    ax.set_box_aspect([1, 1, 1])  # Equal aspect
-    ax.view_init(elev=30, azim=135)  # Better 3D angle
-    ax.set_facecolor('white')
-    ax.set_xlim([-0.55, 0.0])
-    ax.set_xticks([-0.5,0.0])
-    ax.set_ylim([1.95, 2.5])
-    ax.set_yticks([2.0,2.4])
-    ax.set_zlim([-2.2, -1.7])
-    ax.set_zticks([-2.1,-1.8])
-    ax.set_xlabel(r'$x~[m]$', fontsize=30)
-    ax.set_ylabel(r'$y~[m]$', fontsize=30)
-    ax.set_zlabel(r'$z~[m]$', fontsize=30)
-    ax.tick_params(axis='both', which='major', labelsize=20)  # for x and y
-    ax.tick_params(axis='z', which='major', labelsize=20)     # for z
-    ax.set_axis_off()
-
-    plt.tight_layout()
-    plt.savefig(rf"{path_to_figures}/trajectory.svg")
-
-def plot_twists(Xi, s_max, name, input_trajectory, path_to_figures,):
-
-    colors = ['b','r']
-    axes = ['x','y','z']
-
+def initialize_plot_twist_trajectory(pouring_trajectory = False):
     fig = plt.figure(figsize=(7, 3.5))
-    x_axis = np.linspace(0, s_max, Xi[0].shape[2])
-    
+    axis_labels = ['x','y','z']
+
     fontsize_axes = 13
     fontsize_title = 15
+    axes = []
     nb_rows = 2
     nb_columns = 3
     for row_subplot in range(nb_rows):
         for col_subplot in range(nb_columns):
-
-            plt.subplot(nb_rows,nb_columns, 1 + row_subplot*nb_columns + col_subplot)
-
-            for j in range(2):
-                plt.plot(x_axis, Xi[j][row_subplot*nb_columns + col_subplot,0,:], color=colors[j])
+            ax = fig.add_subplot(nb_rows, nb_columns, 1 + row_subplot*nb_columns + col_subplot)
 
             if row_subplot < 0.5:
-                plt.ylim([-4, 4])
-                plt.yticks([-4, 0, 4],fontsize=fontsize_axes)
-                plt.title(rf'$\omega_{{{axes[col_subplot]}}}~[rad/s]$',fontsize=fontsize_title)
+                ax.set_ylim([-2, 2])
+                ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'$\omega_{{{axis_labels[col_subplot]}}}~[rad/s]$',fontsize=fontsize_title)
             else:
-                plt.ylim([-1, 1])
-                plt.yticks([-1, 0, 1],fontsize=fontsize_axes)
-                plt.title(rf'$v_{{{axes[col_subplot]}}}~[m/s]$',fontsize=fontsize_title)
+                ax.set_ylim([-0.5, 0.5])
+                ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'$v_{{{axis_labels[col_subplot]}}}~[m/s]$',fontsize=fontsize_title)
 
-            if input_trajectory == 'pouring':
-                plt.xlim([0, 2.8])
-                plt.xticks([0, 0.7, 1.6, 2.8],fontsize=fontsize_axes)
-            else:
-                plt.xlim([0, s_max])
-                plt.xticks([0, s_max])
+            if pouring_trajectory:
+                ax.set_xlim([0, 5.6])
+                ax.set_xticks([0, 1.4, 3.2, 5.6])
 
-            ax = plt.gca()
             ax.grid(True)
 
             if col_subplot > 0.5:
@@ -232,27 +81,40 @@ def plot_twists(Xi, s_max, name, input_trajectory, path_to_figures,):
             else:
                 ax.tick_params(labelbottom=False)
 
-    fig.tight_layout()  # Adjust subplots to fit in the figure area.
-    plt.savefig(rf'{path_to_figures}/{name}')
+            ax.tick_params(labelsize=fontsize_axes)
+            axes.append(ax)
 
+    fig.tight_layout()
+
+    return fig, axes
+
+def plot_twist_trajectory(axes, twist_trajectory, s_max, color = 'b'):
+
+    progress_axis = np.linspace(0, s_max, twist_trajectory.shape[1])
     
-def plot_U(U, s_max, name, input_trajectory, path_to_figures):
-    
-    colors = ['b','r']
-    linewidths = [3.0,1.5]
+    nb_rows = 2
+    nb_columns = 3
+    ax_counter = 0
+    for row_subplot in range(nb_rows):
+        for col_subplot in range(nb_columns):
+
+            ax = axes[ax_counter]
+            ax.plot(progress_axis, twist_trajectory[row_subplot*nb_columns + col_subplot,:], color=color)
+            ax_counter += 1
+
+    return axes
+
+def initialize_plot_U(pouring_trajectory = False):
 
     fig = plt.figure(figsize=(7, 9))
-    x_axis = np.linspace(0, s_max, U[0].shape[2])
+    axes = []
 
     nb_rows = 6
     nb_columns = 3
     for row_subplot in range(nb_rows):
         for col_subplot in range(nb_columns):
 
-            plt.subplot(nb_rows,nb_columns, 1 + row_subplot*nb_columns + col_subplot)
-
-            for j in range(2):
-                plt.plot(x_axis, U[j][row_subplot,col_subplot,:], color=colors[j], linewidth = linewidths[j])
+            ax = fig.add_subplot(nb_rows,nb_columns, 1 + row_subplot*nb_columns + col_subplot)
 
             # Annotate the plots
             eps_21 = (row_subplot == 1) and (col_subplot == 0)
@@ -275,22 +137,18 @@ def plot_U(U, s_max, name, input_trajectory, path_to_figures):
             fontsize_axes = 13
             fontsize_title = 15
             if row_subplot < 2.5:
-                plt.ylim([-4, 4])
-                plt.yticks([-4, 0, 4], fontsize=fontsize_axes)
-                plt.title(rf'${{{name_component}}}_{{{idx}}}~[rad/s]$', fontsize=fontsize_title )
+                ax.set_ylim([-2, 2])
+                ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[rad/s]$', fontsize=fontsize_title)
             else:
-                plt.ylim([-0.9, 0.9])
-                plt.yticks([-0.9, 0, 0.9], fontsize=fontsize_axes)
-                plt.title(rf'${{{name_component}}}_{{{idx}}}~[m/s]$', fontsize=fontsize_title )
+                ax.set_ylim([-0.5, 0.5])
+                ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[m/s]$', fontsize=fontsize_title)
 
-            if input_trajectory == 'pouring':
-                plt.xlim([0, 2.8])
-                plt.xticks([0, 0.7, 1.6, 2.8], fontsize=fontsize_axes )
-            else:
-                plt.xlim([0, s_max])
-                plt.xticks([0, s_max])
+            if pouring_trajectory:
+                ax.set_xlim([0, 5.6])
+                ax.set_xticks([0, 1.4, 3.2, 5.6])
 
-            ax = plt.gca()
             ax.grid(True)
 
             if col_subplot > 0.5:
@@ -300,11 +158,41 @@ def plot_U(U, s_max, name, input_trajectory, path_to_figures):
                 ax.set_xlabel(r'$t~[s]$', fontsize=fontsize_axes )
             else:
                 ax.tick_params(labelbottom=False)
+
+            ax.tick_params(labelsize=fontsize_axes)
+            axes.append(ax)
             
-    fig.tight_layout()  # Adjust subplots to fit in the figure area.
-    plt.savefig(rf'{path_to_figures}/{name}')
+    fig.tight_layout()
+    return fig, axes
+    
+def plot_U(axes, U, s_max, color = 'b', linewidth = 3.):
+    
+    progress_axis = np.linspace(0, s_max, U.shape[2])
 
-
-
-
+    nb_rows = 6
+    nb_columns = 3
+    ax_counter = 0
+    for row_subplot in range(nb_rows):
+        for col_subplot in range(nb_columns):
             
+            ax = axes[ax_counter]
+            ax.plot(progress_axis, U[row_subplot,col_subplot,:], color=color, linewidth = linewidth)
+            ax_counter += 1
+            
+    return axes
+
+def ax_settings_pouring_trajectory(ax):
+    ax.set_box_aspect([1, 1, 1])  # Equal aspect
+    ax.view_init(elev=30, azim=135)  # Better 3D angle
+    ax.set_xlim([-0.55, 0.0])
+    ax.set_xticks([-0.5,0.0])
+    ax.set_ylim([1.95, 2.5])
+    ax.set_yticks([2.0,2.4])
+    ax.set_zlim([-2.2, -1.7])
+    ax.set_zticks([-2.1,-1.8])
+    ax.tick_params(axis='both', which='major', labelsize=28)  # for x and y
+    ax.tick_params(axis='z', which='major', labelsize=28)     # for z
+    # ax.grid(False)
+    return ax
+            
+

@@ -76,7 +76,7 @@ def SU(X, L=10**10):
 
         # input matrix = [L*U1 U2]
         # target matrix = [L*U1 U2_tri]
-        C = L**2 * U1 @ U1.T + U2 @ U2_tri.T
+        C = L**2 * U1[:,0:2] @ U1[:,0:2].T + U2[:,0:2] @ U2_tri[:,0:2].T
         
         # Compute SVD
         U, _, Vt = np.linalg.svd(C)
