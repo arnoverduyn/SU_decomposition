@@ -45,10 +45,17 @@ def plot_rigid_bodies(ax, T, key_values, object_data):
         ax = plot_rigid_body(ax, T[:,:,j], object_data)
     return ax
 
-def initialize_plot_twist_trajectory(pouring_trajectory = False):
+def initialize_plot_twist_trajectory(progress_domain = 'time', input_trajectory = 'pouring'):
     fig = plt.figure(figsize=(7, 3.5))
     axis_labels = ['x','y','z']
 
+    if progress_domain == 'time':
+        y_axis_units = ['rad/s', 'm/s']  
+        progress_axis_units = 's'
+    elif progress_domain == 'geometric':
+        y_axis_units = ['rad/m', '-']  
+        progress_axis_units = 'm'
+    
     fontsize_axes = 13
     fontsize_title = 15
     axes = []
@@ -59,25 +66,25 @@ def initialize_plot_twist_trajectory(pouring_trajectory = False):
             ax = fig.add_subplot(nb_rows, nb_columns, 1 + row_subplot*nb_columns + col_subplot)
 
             if row_subplot < 0.5:
-                ax.set_ylim([-2, 2])
-                ax.set_yticks([-2, 0, 2])
-                ax.set_title(rf'$\omega_{{{axis_labels[col_subplot]}}}~[rad/s]$',fontsize=fontsize_title)
+                # ax.set_ylim([-2, 2])
+                # ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'$\omega_{{{axis_labels[col_subplot]}}}~[{{{y_axis_units[0]}}}]$',fontsize=fontsize_title)
             else:
-                ax.set_ylim([-0.5, 0.5])
-                ax.set_yticks([-0.5, 0, 0.5])
-                ax.set_title(rf'$v_{{{axis_labels[col_subplot]}}}~[m/s]$',fontsize=fontsize_title)
+                # ax.set_ylim([-0.5, 0.5])
+                # ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'$v_{{{axis_labels[col_subplot]}}}~[{{{y_axis_units[1]}}}]$',fontsize=fontsize_title)
 
-            if pouring_trajectory:
+            if input_trajectory == 'pouring' and progress_domain == 'time':
                 ax.set_xlim([0, 5.6])
                 ax.set_xticks([0, 1.4, 3.2, 5.6])
 
             ax.grid(True)
 
-            if col_subplot > 0.5:
-                ax.tick_params(labelleft=False)
+            # if col_subplot > 0.5:
+            #    ax.tick_params(labelleft=False)
                 
             if row_subplot > 0.5:
-                ax.set_xlabel(r'$t~[s]$',fontsize=fontsize_axes)
+                ax.set_xlabel(rf'$s~[{{{progress_axis_units[0]}}}]$',fontsize=fontsize_axes)
             else:
                 ax.tick_params(labelbottom=False)
 
@@ -104,10 +111,17 @@ def plot_twist_trajectory(axes, twist_trajectory, s_max, color = 'b'):
 
     return axes
 
-def initialize_plot_U(pouring_trajectory = False):
+def initialize_plot_U(progress_domain = 'time', input_trajectory = 'pouring'):
 
     fig = plt.figure(figsize=(7, 9))
     axes = []
+
+    if progress_domain == 'time':
+        y_axis_units = ['rad/s', 'm/s']  
+        progress_axis_units = 's'
+    elif progress_domain == 'geometric':
+        y_axis_units = ['rad/m', '-']  
+        progress_axis_units = 'm'
 
     nb_rows = 6
     nb_columns = 3
@@ -137,25 +151,25 @@ def initialize_plot_U(pouring_trajectory = False):
             fontsize_axes = 13
             fontsize_title = 15
             if row_subplot < 2.5:
-                ax.set_ylim([-2, 2])
-                ax.set_yticks([-2, 0, 2])
-                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[rad/s]$', fontsize=fontsize_title)
+                # ax.set_ylim([-2, 2])
+                # ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[{{{y_axis_units[0]}}}]$', fontsize=fontsize_title)
             else:
-                ax.set_ylim([-0.5, 0.5])
-                ax.set_yticks([-0.5, 0, 0.5])
-                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[m/s]$', fontsize=fontsize_title)
+                # ax.set_ylim([-0.5, 0.5])
+                # ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[{{{y_axis_units[1]}}}]$', fontsize=fontsize_title)
 
-            if pouring_trajectory:
+            if input_trajectory == 'pouring' and progress_domain == 'time':
                 ax.set_xlim([0, 5.6])
                 ax.set_xticks([0, 1.4, 3.2, 5.6])
 
             ax.grid(True)
 
-            if col_subplot > 0.5:
-                ax.tick_params(labelleft=False)
+            # if col_subplot > 0.5:
+            #    ax.tick_params(labelleft=False)
 
             if row_subplot > 4.5:
-                ax.set_xlabel(r'$t~[s]$', fontsize=fontsize_axes )
+                ax.set_xlabel(rf'$s~[{{{progress_axis_units}}}]$', fontsize=fontsize_axes )
             else:
                 ax.tick_params(labelbottom=False)
 
@@ -182,7 +196,6 @@ def plot_U(axes, U, s_max, color = 'b', linewidth = 3.):
     return axes
 
 def ax_settings_pouring_trajectory(ax):
-    ax.set_box_aspect([1, 1, 1])  # Equal aspect
     ax.view_init(elev=30, azim=135)  # Better 3D angle
     ax.set_xlim([-0.55, 0.0])
     ax.set_xticks([-0.5,0.0])
@@ -190,6 +203,10 @@ def ax_settings_pouring_trajectory(ax):
     ax.set_yticks([2.0,2.4])
     ax.set_zlim([-2.2, -1.7])
     ax.set_zticks([-2.1,-1.8])
+    return ax
+
+def ax_settings_general(ax):
+    ax.set_box_aspect([1, 1, 1])  # Equal aspect
     ax.tick_params(axis='both', which='major', labelsize=28)  # for x and y
     ax.tick_params(axis='z', which='major', labelsize=28)     # for z
     # ax.grid(False)

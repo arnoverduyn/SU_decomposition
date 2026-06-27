@@ -27,6 +27,27 @@ def load_pose_data_from_csv(csv_file):
 
     return T, t
 
+def load_pose_data_from_dat(dat_file):
+    """
+    This function loads the .dat file in the data folder.
+    It is assumed that this .dat file has the following format:
+    - it has no header row
+    - its first column contains the time vector
+    - its second to fourth columns contain the xyz position coordinates
+    - its fifth to eighth columns contain the quaternion coordinates [w x y z]
+    It returns the pose trajectory T, and the time vector t
+    """
+
+    raw_data = pd.read_csv(dat_file, header=0, sep=r"\s+", dtype=np.float64).values
+
+    t = raw_data[:, 0]
+    pos = raw_data[:, 1:4].T
+    quat = raw_data[:, 4:8].T
+
+    T = quat2pose(pos, quat)
+
+    return T, t
+
 def remove_offset_array(array):
     array -= array[0]
     return array
@@ -56,6 +77,10 @@ def load_demo_trajectory(input_trajectory,path_to_data):
         T, dt = synthetic_precession()
     elif input_trajectory == 'pouring':
         T, dt = load_recorded_pouring_motion(path_to_data)
+    elif input_trajectory == 'contour_following':
+        T, dt = load_recorded_contour_following_motion(path_to_data)
+    elif input_trajectory == 'peg_on_hole_alignment':
+        T, dt = load_recorded_peg_on_hole_alignment_motion(path_to_data)
     N = T.shape[2]
     time_total = (N-1)*dt
     return T, N, dt, time_total
@@ -159,6 +184,34 @@ def load_recorded_pouring_motion(path_to_data):
     # Extract first half of the trajectory
     index_cut = round(N / 2) + 20
     T = T[:, :, :index_cut]  
+
+    return T, dt
+
+def load_recorded_contour_following_motion(path_to_data):
+
+    data_file = rf'{path_to_data}/Demos/contour_following/data_demo_a_1.dat'
+    T, t = load_pose_data_from_dat(data_file)
+    t = remove_offset_array(t)
+
+    # Interpolate pose data to equidistant timesteps
+    dt = 0.02
+    N = calculate_number_of_equidistant_steps_in_array(t, stepsize = dt)
+    t_equidistant = make_array_equidistant(t, N)
+    T = interpT(t, T, t_equidistant)
+
+    return T, dt
+
+def load_recorded_peg_on_hole_alignment_motion(path_to_data):
+
+    data_file = rf'{path_to_data}/Demos/peg_on_hole_alignment/data_demo_a_1.dat'
+    T, t = load_pose_data_from_dat(data_file)
+    t = remove_offset_array(t)
+
+    # Interpolate pose data to equidistant timesteps
+    dt = 0.02
+    N = calculate_number_of_equidistant_steps_in_array(t, stepsize = dt)
+    t_equidistant = make_array_equidistant(t, N)
+    T = interpT(t, T, t_equidistant)
 
     return T, dt
 

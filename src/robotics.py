@@ -193,4 +193,37 @@ def calculate_bodytwist_from_poses(T, ds):
     return twist
 
 
+def calculate_geom_progress_axis(T,dt,L):
+    """
+    This function calculates the screwbased geometric progress axis for rigid
+    body trajectories from input pose data. The twist components are
+    estimated from the pose data using a finite differences scheme.
+    INPUT : T (4x4xN)      -> Input pose trajectory
+          : dt             -> Corresponding time step [s]
+          : L              -> value for the characteristic length
+    OUTPUT: s (1xN)   -    -> calculated geometric progress axis
+    """
+
+    N = T.shape[2]
+    s = np.zeros(N)
+    bodytwists = calculate_bodytwist_from_poses(T, dt)
+
+    for k in range(N-1):
+        omega = bodytwists[0:3,k]
+        vel = bodytwists[3:6,k]
+        if np.linalg.norm(omega) == 0:
+            v1 = np.linalg.norm(vel)
+        else:
+            p_perp = np.cross(omega,vel)/np.dot(omega,omega)
+            if np.linalg.norm(p_perp) > L:
+                p_regularized = L*p_perp/np.linalg.norm(p_perp)
+                vel_regularized = vel + np.cross(omega,p_regularized)
+                v1 = np.linalg.norm(vel_regularized)
+            else:
+                v1 = np.dot(vel,omega)/np.linalg.norm(omega)
+        
+        s_dot = np.sqrt(L**2*np.dot(omega,omega) + v1**2)
+        s[k+1]= s[k] + s_dot*dt
+
+    return s
 
