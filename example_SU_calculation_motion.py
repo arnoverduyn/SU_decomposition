@@ -3,10 +3,10 @@ import scipy, numpy, src.data_handling, src.robotics, src.SU_decomp, src.plottin
 import matplotlib.pyplot as plt
 
 ############ Input ##########
-input_trajectory = 'pouring' 
+input_trajectory = 'peg_on_hole_alignment' 
 # options: 'helical_translation', 'axis_rotation', 'precession', 'pouring', 'contour_following',
 #          'peg_on_hole_alignment'
-progress_domain = 'time'
+progress_domain = 'geometric'
 # options: 'time', 'geometric'
 
 ############ Load and preprocess the trajectory and object data ##########
@@ -14,7 +14,7 @@ path_to_data = 'Data'
 path_to_figures = 'figures'
 
 # Load the trajectory data
-T_raw, N, dt, time_total = src.data_handling.load_demo_trajectory(input_trajectory,path_to_data)
+T_raw, N, dt, time_total = src.data_handling.load_demo_trajectory_motion(input_trajectory,path_to_data)
 
 if progress_domain == 'time':
     # Subsample raw trajectory data

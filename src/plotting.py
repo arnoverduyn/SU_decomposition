@@ -111,6 +111,56 @@ def plot_twist_trajectory(axes, twist_trajectory, s_max, color = 'b'):
 
     return axes
 
+def initialize_plot_wrench_trajectory(progress_domain = 'time', input_trajectory = 'pouring'):
+    fig = plt.figure(figsize=(7, 3.5))
+    axis_labels = ['x','y','z']
+
+    y_axis_units = ['N', 'Nm']  
+    if progress_domain == 'time':
+        progress_axis_units = 's'
+    elif progress_domain == 'geometric':
+        progress_axis_units = 'm'
+    
+    fontsize_axes = 13
+    fontsize_title = 15
+    axes = []
+    nb_rows = 2
+    nb_columns = 3
+    for row_subplot in range(nb_rows):
+        for col_subplot in range(nb_columns):
+            ax = fig.add_subplot(nb_rows, nb_columns, 1 + row_subplot*nb_columns + col_subplot)
+
+            if row_subplot < 0.5:
+                # ax.set_ylim([-2, 2])
+                # ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'$f_{{{axis_labels[col_subplot]}}}~[{{{y_axis_units[0]}}}]$',fontsize=fontsize_title)
+            else:
+                # ax.set_ylim([-0.5, 0.5])
+                # ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'$\tau_{{{axis_labels[col_subplot]}}}~[{{{y_axis_units[1]}}}]$',fontsize=fontsize_title)
+
+            if input_trajectory == 'pouring' and progress_domain == 'time':
+                ax.set_xlim([0, 5.6])
+                ax.set_xticks([0, 1.4, 3.2, 5.6])
+
+            ax.grid(True)
+
+            # if col_subplot > 0.5:
+            #    ax.tick_params(labelleft=False)
+                
+            if row_subplot > 0.5:
+                ax.set_xlabel(rf'$s~[{{{progress_axis_units[0]}}}]$',fontsize=fontsize_axes)
+            else:
+                ax.tick_params(labelbottom=False)
+
+            ax.tick_params(labelsize=fontsize_axes)
+            axes.append(ax)
+
+    fig.tight_layout()
+
+    return fig, axes
+
+
 def initialize_plot_U(progress_domain = 'time', input_trajectory = 'pouring'):
 
     fig = plt.figure(figsize=(7, 9))
@@ -121,6 +171,73 @@ def initialize_plot_U(progress_domain = 'time', input_trajectory = 'pouring'):
         progress_axis_units = 's'
     elif progress_domain == 'geometric':
         y_axis_units = ['rad/m', '-']  
+        progress_axis_units = 'm'
+
+    nb_rows = 6
+    nb_columns = 3
+    for row_subplot in range(nb_rows):
+        for col_subplot in range(nb_columns):
+
+            ax = fig.add_subplot(nb_rows,nb_columns, 1 + row_subplot*nb_columns + col_subplot)
+
+            # Annotate the plots
+            eps_21 = (row_subplot == 1) and (col_subplot == 0)
+            eps_31 = (row_subplot == 2) and (col_subplot == 0)
+            eps_32 = (row_subplot == 2) and (col_subplot == 1)
+
+            eps_51 = (row_subplot == 4) and (col_subplot == 0)
+            eps_61 = (row_subplot == 5) and (col_subplot == 0)
+            eps_62 = (row_subplot == 5) and (col_subplot == 1)
+
+            residual_term = eps_21 or eps_31 or eps_32 or eps_51 or eps_61 or eps_62
+
+            if residual_term:
+                name_component = r'\epsilon'
+            else:
+                name_component = 'u'
+
+            idx = f'{row_subplot+1}{col_subplot+1}'
+
+            fontsize_axes = 13
+            fontsize_title = 15
+            if row_subplot < 2.5:
+                # ax.set_ylim([-2, 2])
+                # ax.set_yticks([-2, 0, 2])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[{{{y_axis_units[0]}}}]$', fontsize=fontsize_title)
+            else:
+                # ax.set_ylim([-0.5, 0.5])
+                # ax.set_yticks([-0.5, 0, 0.5])
+                ax.set_title(rf'${{{name_component}}}_{{{idx}}}~[{{{y_axis_units[1]}}}]$', fontsize=fontsize_title)
+
+            if input_trajectory == 'pouring' and progress_domain == 'time':
+                ax.set_xlim([0, 5.6])
+                ax.set_xticks([0, 1.4, 3.2, 5.6])
+
+            ax.grid(True)
+
+            # if col_subplot > 0.5:
+            #    ax.tick_params(labelleft=False)
+
+            if row_subplot > 4.5:
+                ax.set_xlabel(rf'$s~[{{{progress_axis_units}}}]$', fontsize=fontsize_axes )
+            else:
+                ax.tick_params(labelbottom=False)
+
+            ax.tick_params(labelsize=fontsize_axes)
+            axes.append(ax)
+            
+    fig.tight_layout()
+    return fig, axes
+
+def initialize_plot_U_wrench(progress_domain = 'time', input_trajectory = 'pouring'):
+
+    fig = plt.figure(figsize=(7, 9))
+    axes = []
+
+    y_axis_units = ['N', 'Nm']  
+    if progress_domain == 'time':
+        progress_axis_units = 's'
+    elif progress_domain == 'geometric':
         progress_axis_units = 'm'
 
     nb_rows = 6
