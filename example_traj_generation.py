@@ -10,16 +10,55 @@ path_to_figures = 'figures'
 
 ############ Load and preprocess the trajectory data ##########
 
-# Load the data
-input_trajectory = 'pouring'  # options: 'helical_translation', 'axis_rotation', 'precession', 'pouring'
-T_raw, dt = src.data_handling.load_demo_trajectory(input_trajectory,path_to_data)
-N = T_raw.shape[2]
-time_total = (N-1)*dt
+############ Input ##########
+input_trajectory = 'pouring' 
+# options: 'helical_translation', 'axis_rotation', 'precession', 'pouring', 'contour_following',
+#          'peg_on_hole_alignment'
+progress_domain = 'geometric'
+# options: 'time', 'geometric'
 
-# Subsample raw trajectory data
-T_sub = T_raw[:,:,0:N:3]
-dt = 3*dt
-N = T_sub.shape[2]
+
+############ Load and preprocess the trajectory and object data ##########
+path_to_data = 'Data'
+path_to_figures = 'figures'
+
+# Load the trajectory data
+T_raw, N, dt, time_total = src.data_handling.load_demo_trajectory_motion(input_trajectory,path_to_data)
+
+if progress_domain == 'time':
+    # Subsample raw trajectory data
+    T, ds = T_raw[:,:,0:N:3], 3*dt
+    N = T.shape[2]
+elif progress_domain == 'geometric':
+    # Interpolate pose data to equidistant geometric progress steps
+    s = src.robotics.calculate_geom_progress_axis(T_raw, dt, L=0.3)
+    ds = 0.02 # -> 2 cm
+    N = src.data_handling.calculate_number_of_equidistant_steps_in_array(s, stepsize = ds)
+    s_equidistant = src.data_handling.make_array_equidistant(s, N)
+    T = src.robotics.interpT(s, T_raw, s_equidistant)
+
+# Load the data of the rigid body
+if input_trajectory == 'pouring':
+    object_data = src.data_handling.load_data_kettle(path_to_data)
+    T_kettle_wrt_tracker = src.data_handling.load_tracker_kettle_calibration_data()
+    nb_vertices = object_data['vertices'].shape[0]
+    hom_vertices = numpy.column_stack([object_data['vertices'],numpy.ones(nb_vertices)])
+    calibrated_vertices = T_kettle_wrt_tracker @ hom_vertices.T
+    object_data['vertices'] = calibrated_vertices[:3,:].T
+else:
+    object_data = src.data_handling.create_cube_data()
+
+# Plot the original rigid-body trajectory
+fig = plt.figure(figsize=(9, 9))
+ax = fig.add_subplot(111, projection='3d')
+key_values_body_frame, key_values_rigid_object = [0,-1], [0,-1]
+ax = src.plotting.plot_trajectory_origin(ax, T, color = 'b', linewidth = 3.)
+ax = src.plotting.plot_frames(ax, T, key_values_body_frame , color = 'b', linewidth = 3., arrow_len = 0.08)
+ax = src.plotting.plot_rigid_bodies(ax, T, key_values_rigid_object, object_data)
+ax = src.plotting.ax_settings_general(ax)
+if input_trajectory == 'pouring':
+    ax = src.plotting.ax_settings_pouring_trajectory(ax)
+fig.savefig(rf"{path_to_figures}/input_trajectory.svg")
 
 ############ Calculate the SU decomposition ########## 
 
@@ -28,7 +67,7 @@ Xi = numpy.zeros((6,3,N-3))
 U = numpy.zeros((6,3,N-3))
 
 # Calculate body twist trajectory
-twist = src.robotics.calculate_bodytwist_from_poses(T_sub,dt)
+twist = src.robotics.calculate_bodytwist_from_poses(T,ds)
 
 # Perform the successive SU decompositions along the trajectory
 for k in range(N-3): 
@@ -45,18 +84,18 @@ for k in range(N-3):
 
 
 ############ Plot the results ########## 
-nb_traj = 1
-src.plotting.plot_trajectories(T_sub, T_sub, nb_traj, input_trajectory, path_to_data, path_to_figures, name = "trajectory.svg")
-src.plotting.plot_U(U, time_total, nb_traj, 'U.svg', input_trajectory, path_to_figures)
+fig, axes = src.plotting.initialize_plot_U(progress_domain, input_trajectory)
+axes = src.plotting.plot_U(axes, U, time_total, color = 'b', linewidth = 2.0)
+fig.savefig(rf"{path_to_figures}/U_reg.svg")
 
 ############ Test reconstruction ###########
 
 # Initialization
 T_rec = numpy.zeros((4,4,N))
-T_rec[:,:,0:3] = T_sub[:,:,0:3]
+T_rec[:,:,0:3] = T[:,:,0:3]
 twist_rec = numpy.zeros((6,N-1))
-twist_rec[:,0] = numpy.squeeze(src.robotics.calculate_bodytwist_from_poses(T_rec[:,:,0:2],dt))
-twist_rec[:,1] = numpy.squeeze(src.robotics.calculate_bodytwist_from_poses(T_rec[:,:,1:3],dt))
+twist_rec[:,0] = numpy.squeeze(src.robotics.calculate_bodytwist_from_poses(T_rec[:,:,0:2],ds))
+twist_rec[:,1] = numpy.squeeze(src.robotics.calculate_bodytwist_from_poses(T_rec[:,:,1:3],ds))
 
 Xi_rec = numpy.zeros((6,3,N-3))
 Xi_rec[:,0,0] = twist_rec[:,0]
@@ -80,24 +119,38 @@ for k in range(N-3):
     # Reconstruct pose
     twist_matrix[0:3,0:3] = src.robotics.skew(twist_[0:3])
     twist_matrix[0:3,3] = twist_[3:6]
-    T_rec[:,:,3+k] = T_rec[:,:,3+k-1] @ scipy.linalg.expm(twist_matrix*dt)
+    T_rec[:,:,3+k] = T_rec[:,:,3+k-1] @ scipy.linalg.expm(twist_matrix*ds)
 
     if k < N-4:
         # Update twist window
         Xi_rec[:,0,k+1] = Xi_rec[:,1,k]
         Xi_rec[:,1,k+1] = Xi_rec[:,2,k]
 
-src.plotting.plot_trajectories(T_rec, T_rec, nb_traj, input_trajectory, path_to_data, path_to_figures, name = "reconstruction.svg")
+MS_reconstruction_error = 0.
+for k in range(N):
+    error = numpy.sum((T_rec-T)**2)
+    MS_reconstruction_error += error
+
+# Plot the reconstructed rigid-body trajectory
+fig = plt.figure(figsize=(9, 9))
+ax = fig.add_subplot(111, projection='3d')
+key_values_body_frame, key_values_rigid_object = [0,-1], [0,-1]
+ax = src.plotting.plot_trajectory_origin(ax, T_rec, color = 'r', linewidth = 3.)
+ax = src.plotting.plot_frames(ax, T_rec, key_values_body_frame , color = 'r', linewidth = 3., arrow_len = 0.08)
+ax = src.plotting.plot_rigid_bodies(ax, T_rec, key_values_rigid_object, object_data)
+ax = src.plotting.ax_settings_general(ax)
+if input_trajectory == 'pouring':
+    ax = src.plotting.ax_settings_pouring_trajectory(ax)
+fig.savefig(rf"{path_to_figures}/reconstructed_trajectory.svg")
 
 ##################### Trajectory generalization ####################################################
-# T_target = numpy.array([[0., 0., -1., 0.5],[1., 0., 0., 2.],[0., -1., 0., -2.], [0.,  0.,  0.,  1.]])
 T_target = numpy.array([[0., 0., -1., -0.5],[1., 0., 0., 2.2],[0., -1., 0., -2.], [0.,  0.,  0.,  1.]])
 
-nb_targets = 5
+nb_targets = 3
 generated_trajectories = numpy.zeros((nb_targets,4,4,N))
 for Q in range(nb_targets):
 
-    T_target[0,3] += 0.15
+    T_target[0,3] += 0.25
 
     error_target = numpy.sum((T_rec[:,:,-1]-T_target)**2)
 
@@ -116,7 +169,7 @@ for Q in range(nb_targets):
         
         twist_gen_matrix[:3,:3] = src.robotics.skew(twist_gen[:3,k+2])
         twist_gen_matrix[:3,3] = twist_gen[3:6,k+2]
-        T_gen_next = T_gen[:,:,2+k] @ scipy.linalg.expm(twist_gen_matrix*dt)
+        T_gen_next = T_gen[:,:,2+k] @ scipy.linalg.expm(twist_gen_matrix*ds)
 
         # Update trajectory
         T_gen[:,:,3+k] = correction_pose_matrix_in_world @ T_gen_next
@@ -128,73 +181,16 @@ for Q in range(nb_targets):
     print(error_target)
 
 
+# Plot the reconstructed rigid-body trajectory
 fig = plt.figure(figsize=(9, 9))
 ax = fig.add_subplot(111, projection='3d')
-
-# Lighting setup
-ls = LightSource(azdeg=135, altdeg=45)
-keyframes = [0, N-1]
-
-# Calibrate object vertices
-(kettle,_,_,_) = src.data_handling.retrieve_data_designed_objects(path_to_data)
-vertices = numpy.vstack((kettle['homogeneous_vertices'][:3, :], kettle['homogeneous_vertices'][3, :]))
-vertices[:3, :] += numpy.array([[-0.05], [0.04], [-0.01]])  # Offset
-rot = R__.from_euler('xzx', [180, 150, 4], degrees=True).as_matrix()
-T_obj = numpy.eye(4)
-T_obj[:3, :3] = rot
-vertices = T_obj @ vertices
-    
+key_values_body_frame, key_values_rigid_object = [0,-1], [0,-1]
 for Q in range(nb_targets):
-    T = generated_trajectories[Q,:,:,:]
-
-    for k in keyframes:
-
-        transformed_vertices = T[:, :, k] @ vertices
-
-        # Face vertices for 3D collection
-        poly3d = [[transformed_vertices[:3, j] for j in face] for face in kettle['faces']]
-        verts_array = numpy.array([numpy.array(face) for face in poly3d])
-
-        normals = src.plotting.compute_normals(verts_array)
-
-        # Lighting shading via LightSource
-        shade_vals = ls.shade_normals(normals, fraction=1.0)  # Grayscale
-        cmap = plt.cm.Blues  # Or try 'viridis', 'plasma', etc.
-        shade_colors = cmap(0.4/(shade_vals+0.01))  # Map grayscale to RGBA
-        collection = Poly3DCollection(verts_array, facecolors=shade_colors, edgecolors='none', linewidths=0)
-        collection.set_alpha(0.15)
-        ax.add_collection3d(collection)
-
-    # Plot trajectories of the origin of the body
-    start_end_frames = [keyframes[0],keyframes[-1]]
-    p = T[0:3, 3, :] 
-
-    # Plot continuous trajectory of frame origin    
-    ax.plot(p[0, :], p[1, :], p[2, :], color = 'b', linewidth=4)
-
-    # Plot body frames at start and end
-    ROT = T[:3,:3,start_end_frames]
-    arrow_len = 0.08  
-    ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 0], ROT[1, 0], ROT[2, 0], length=arrow_len, normalize=True, color = 'b', linewidth=3.0)
-    ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 1], ROT[1, 1], ROT[2, 1], length=arrow_len, normalize=True, color = 'b', linewidth=3.0)
-    ax.quiver(p[0, start_end_frames], p[1, start_end_frames], p[2, start_end_frames], ROT[0, 2], ROT[1, 2], ROT[2, 2], length=arrow_len, normalize=True, color = 'b', linewidth=3.0)
-
-ax.grid(False)
-ax.set_box_aspect([1, 1, 1])  # Equal aspect
-ax.view_init(elev=30, azim=135)  # Better 3D angle
-ax.set_facecolor('white')
-ax.set_xlim([-0.55, 0.0])
-ax.set_xticks([-0.5,0.0])
-ax.set_ylim([1.95, 2.5])
-ax.set_yticks([2.0,2.4])
-ax.set_zlim([-2.2, -1.7])
-ax.set_zticks([-2.1,-1.8])
-ax.set_xlabel(r'$x~[m]$', fontsize=30)
-ax.set_ylabel(r'$y~[m]$', fontsize=30)
-ax.set_zlabel(r'$z~[m]$', fontsize=30)
-ax.tick_params(axis='both', which='major', labelsize=20)  # for x and y
-ax.tick_params(axis='z', which='major', labelsize=20)     # for z
-ax.set_axis_off()
-
-plt.tight_layout()
-plt.savefig(rf"{path_to_figures}/generation_multiple.svg")
+    T_gen = generated_trajectories[Q,:,:,:]
+    ax = src.plotting.plot_trajectory_origin(ax, T_gen, color = 'r', linewidth = 3.)
+    ax = src.plotting.plot_frames(ax, T_gen, key_values_body_frame , color = 'r', linewidth = 3., arrow_len = 0.08)
+    ax = src.plotting.plot_rigid_bodies(ax, T_gen, key_values_rigid_object, object_data)
+    ax = src.plotting.ax_settings_general(ax)
+if input_trajectory == 'pouring':
+    ax = src.plotting.ax_settings_pouring_trajectory(ax)
+fig.savefig(rf"{path_to_figures}/generated_trajectories.svg")
