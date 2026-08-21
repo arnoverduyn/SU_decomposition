@@ -2,8 +2,6 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 jobs:
@@ -47,7 +45,7 @@ jobs:
             echo "Running $f"
             python "$f"
           done
-          
+
       - name: Run all notebooks
         run: |
           for nb in notebooks/*.ipynb; do
